@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace EasyUpdater
+namespace EasyUpdater.Models
 {
     public class AppConfiguration
     {

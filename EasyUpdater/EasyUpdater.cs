@@ -1,20 +1,32 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Timers;
+using EasyUpdater.Crypto;
 using EasyUpdater.Enumerations;
 using EasyUpdater.Helpers;
+using EasyUpdater.Models;
+using EasyUpdater.UpdateRoutines;
 
 namespace EasyUpdater
 {
     public class EasyUpdater : IDisposable
     {
-        public bool Running { get; private set; }
-        public double CurrentProgress { get; private set; }
-        public double TotalFilesToDownload { get; private set; }
-        public double DownloadedFiles { get; private set; }
+        public bool Running => updateRoutine.Running;
+        public double CurrentProgress  => updateRoutine.CurrentProgress;
+        public double TotalFilesToDownload  => updateRoutine.TotalFilesToDownload;
+        public double DownloadedFiles => updateRoutine.DownloadedFiles;
 
-        public TimeSpan UpdateCheckInterval { get; set; } = new TimeSpan(1,0,0);
+        public TimeSpan UpdateCheckInterval
+        {
+            get => updateCheckInterval;
+            set
+            {
+                updateCheckInterval = value;
+                timer.Interval = updateCheckInterval.TotalMilliseconds;
+            }
+        }
 
         /// <summary>
         /// Path to save the downloads.
@@ -23,7 +35,7 @@ namespace EasyUpdater
         
         public DownloadMode DownloadMode { get; set; } = DownloadMode.Dynamic;
 
-        public HashAlgorithm HashAlgorithm { get; set; } = new Crc32();
+        public static HashAlgorithm HashAlgorithm { get; set; } = new Crc32();
 
         /// <summary>
         /// Path to extract the zip file if download is compressed.
@@ -34,15 +46,27 @@ namespace EasyUpdater
 
         private readonly string appConfigUrl;
         private readonly Timer timer;
+        private TimeSpan updateCheckInterval = new TimeSpan(1, 0, 0);
+        private readonly IUpdateRoutine updateRoutine;
+
+        internal static string CurrentDirectory;
 
         public EasyUpdater(string appConfigUrl)
         {
+            CurrentDirectory = Directory.GetCurrentDirectory();
             this.appConfigUrl = appConfigUrl;
             timer = new Timer(new TimeSpan(1,0,0).TotalMilliseconds)
             {
                 AutoReset = true
             };
             timer.Elapsed += (sender, args) => CheckForUpdate();
+
+            updateRoutine = DownloadMode switch
+            {
+                DownloadMode.Dynamic => new DynamicUpdateRoutine(appConfiguration),
+                DownloadMode.Compressed => new CompressedUpdateRoutine(),
+                _ => throw new ArgumentOutOfRangeException()
+            };
         }
 
         public async void Start()
@@ -59,12 +83,7 @@ namespace EasyUpdater
 
         public async void CheckForUpdate()
         {
-            
-        }
-
-        public void SetUpdateInterval(TimeSpan updateInterval)
-        {
-            timer.Interval = updateInterval.TotalMilliseconds;
+            await updateRoutine.Run();
         }
 
         public void Dispose()
