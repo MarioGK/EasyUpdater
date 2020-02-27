@@ -1,64 +1,46 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
-using EasyUpdater.Helpers;
-using EasyUpdater.Models;
 
 namespace EasyUpdater.UpdateRoutines
 {
-    public abstract class BaseRoutine : IUpdateRoutine
+    public abstract class BaseRoutine : IDisposable
     {
-        protected static readonly string AssemblyPath = Assembly.GetExecutingAssembly().Location;
+        public event EasyUpdater.VoidDelegate ProgressChanged;
+        public event EasyUpdater.VoidDelegate Started;
+        public event EasyUpdater.VoidDelegate Finished;
         
+        protected static readonly string AssemblyPath = Assembly.GetExecutingAssembly().Location;
+
         public bool Running { get; set; }
         public double CurrentProgress { get; set; }
         public double TotalFilesToDownload { get; set; }
         public double DownloadedFiles { get; set; }
-        
-        public delegate void VoidDelegate();
-        public delegate bool BoolDelegate();
 
-        public event VoidDelegate ProgressChanged;
-        public event BoolDelegate Start;
-        public event BoolDelegate Finish;
+        public bool CanRun { get; set; } = true;
 
         public abstract Task Run();
+
 
         protected void NotifyProgressChange(double progress)
         {
             CurrentProgress = progress;
             ProgressChanged?.Invoke();
         }
-        
-        protected bool NotifyStart()
+
+        protected void NotifyStart()
         {
-            var value = Start?.Invoke() ?? true;
-            Running = value;
-            return value;
+            Started?.Invoke();
+            Running = true;
         }
 
-        protected bool NotifyEnd()
+        protected void NotifyEnd()
         {
             Running = false;
-            return Finish?.Invoke() ?? true;
+            Finished?.Invoke();
         }
 
-        /// <summary>
-        /// Returns the different files
-        /// </summary>
-        /// <returns></returns>
-        protected static IEnumerable<AppFile> GetDifferentFiles(IEnumerable<AppFile> remoteFiles)
-        {
-            return from remoteFile in remoteFiles
-                let localFile = Path.Combine(AssemblyPath, remoteFile.FilePath)
-                let localFileChecksum = localFile.CalculateChecksum()
-                where remoteFile.Checksum != localFileChecksum
-                select remoteFile;
-        }
 
         protected void DownloadFile(string url, string downloadLocation)
         {
@@ -70,6 +52,10 @@ namespace EasyUpdater.UpdateRoutines
                 NotifyProgressChange(1);
             };
             wc.DownloadFileAsync(new Uri(url), downloadLocation);
+        }
+
+        public void Dispose()
+        {
         }
     }
 }

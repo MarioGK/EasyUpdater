@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Timers;
@@ -13,10 +12,67 @@ namespace EasyUpdater
 {
     public class EasyUpdater : IDisposable
     {
-        public bool Running => updateRoutine.Running;
-        public double CurrentProgress  => updateRoutine.CurrentProgress;
-        public double TotalFilesToDownload  => updateRoutine.TotalFilesToDownload;
-        public double DownloadedFiles => updateRoutine.DownloadedFiles;
+        internal static string CurrentDirectory;
+
+        private readonly string appConfigUrl;
+        private readonly Timer timer;
+        public BaseRoutine UpdateRoutine { get; set; }
+        
+        public delegate void VoidDelegate();
+        
+        public event VoidDelegate ProgressChanged;
+        public event VoidDelegate Started;
+        public event VoidDelegate Finished;
+
+        private AppConfiguration appConfiguration;
+        private TimeSpan updateCheckInterval = new TimeSpan(1, 0, 0);
+
+        public EasyUpdater(string appConfigUrl)
+        {
+            CurrentDirectory = Directory.GetCurrentDirectory();
+            this.appConfigUrl = appConfigUrl;
+            
+            timer = new Timer(new TimeSpan(1, 0, 0).TotalMilliseconds)
+            {
+                AutoReset = true
+            };
+        }
+
+        private bool initialized;
+
+        private void Initialize()
+        {
+            if (initialized)
+            {
+                return;
+            }
+
+            initialized = true;
+
+            timer.Elapsed += (sender, args) => CheckForUpdate();
+
+            UpdateRoutine = DownloadMode switch
+            {
+                DownloadMode.Dynamic => new DynamicUpdateRoutine(appConfiguration),
+                DownloadMode.Compressed => new CompressedUpdateRoutine(),
+                //DownloadMode.Custom => null,
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
+            UpdateRoutine.Started += NotifyStartEvent;
+            UpdateRoutine.Finished += NotifyFinishEvent;
+            UpdateRoutine.ProgressChanged += NotifyProgressChanged;
+        }
+
+        public bool CanRun
+        {
+            get => UpdateRoutine.CanRun;
+            set => UpdateRoutine.CanRun = value;
+        }
+        public bool Running => UpdateRoutine.Running;
+        public double CurrentProgress => UpdateRoutine.CurrentProgress;
+        public double TotalFilesToDownload => UpdateRoutine.TotalFilesToDownload;
+        public double DownloadedFiles => UpdateRoutine.DownloadedFiles;
 
         public TimeSpan UpdateCheckInterval
         {
@@ -29,50 +85,38 @@ namespace EasyUpdater
         }
 
         /// <summary>
-        /// Path to save the downloads.
+        ///     Path to save the downloads.
         /// </summary>
         public string DownloadPath { get; set; } = Path.Combine(Directory.GetCurrentDirectory(), "Downloads");
-        
+
         public DownloadMode DownloadMode { get; set; } = DownloadMode.Dynamic;
-
-        public static HashAlgorithm HashAlgorithm { get; set; } = new Crc32();
-
+        
         /// <summary>
-        /// Path to extract the zip file if download is compressed.
+        ///     Path to extract the zip file if download is compressed.
         /// </summary>
         public string InstallationPath { get; set; }
 
-        private AppConfiguration appConfiguration;
-
-        private readonly string appConfigUrl;
-        private readonly Timer timer;
-        private TimeSpan updateCheckInterval = new TimeSpan(1, 0, 0);
-        private readonly IUpdateRoutine updateRoutine;
-
-        internal static string CurrentDirectory;
-
-        public EasyUpdater(string appConfigUrl)
+        public void Dispose()
         {
-            CurrentDirectory = Directory.GetCurrentDirectory();
-            this.appConfigUrl = appConfigUrl;
-            timer = new Timer(new TimeSpan(1,0,0).TotalMilliseconds)
-            {
-                AutoReset = true
-            };
-            timer.Elapsed += (sender, args) => CheckForUpdate();
-
-            updateRoutine = DownloadMode switch
-            {
-                DownloadMode.Dynamic => new DynamicUpdateRoutine(appConfiguration),
-                DownloadMode.Compressed => new CompressedUpdateRoutine(),
-                _ => throw new ArgumentOutOfRangeException()
-            };
+            timer?.Dispose();
+            UpdateRoutine?.Dispose();
         }
 
+        /// <summary>
+        /// Starts and initializes the Updater.
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         public async void Start()
         {
-            appConfiguration = await JsonFetcher.FetchAsync<AppConfiguration>(appConfigUrl);
+            Initialize();
             
+            if (DownloadMode == DownloadMode.Custom && UpdateRoutine == null)
+            {
+                throw new Exception("You have to provide a UpdateRoutine when you select the Custom download mode.");
+            }
+            
+            appConfiguration = await JsonFetcher.FetchAsync<AppConfiguration>(appConfigUrl);
+
             timer.Start();
         }
 
@@ -81,15 +125,32 @@ namespace EasyUpdater
             timer.Stop();
         }
 
+        /// <summary>
+        /// Force a check for updates.
+        /// </summary>
         public async void CheckForUpdate()
         {
-            await updateRoutine.Run();
+            if (Running)
+            {
+                return;
+            }
+            
+            await UpdateRoutine.Run();
         }
 
-        public void Dispose()
+        private void NotifyStartEvent()
         {
-            timer?.Dispose();
-            HashAlgorithm?.Dispose();
+            Started?.Invoke();
+        }
+        
+        private void NotifyFinishEvent()
+        {
+            Finished?.Invoke();
+        }
+
+        private void NotifyProgressChanged()
+        {
+            ProgressChanged?.Invoke();
         }
     }
 }

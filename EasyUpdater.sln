@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyUpdater.Publisher", "Ea
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyUpdater.Publisher.Tests", "EasyUpdater.Publisher.Tests\EasyUpdater.Publisher.Tests.csproj", "{454E7B8B-18F3-40D7-88FC-CF0A4951E765}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyUpdater.Example", "EasyUpdater.Example\EasyUpdater.Example.csproj", "{F6ADDBAF-567A-4BD4-9C5D-C38770F3AED7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +34,10 @@ Global
 		{454E7B8B-18F3-40D7-88FC-CF0A4951E765}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{454E7B8B-18F3-40D7-88FC-CF0A4951E765}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{454E7B8B-18F3-40D7-88FC-CF0A4951E765}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F6ADDBAF-567A-4BD4-9C5D-C38770F3AED7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F6ADDBAF-567A-4BD4-9C5D-C38770F3AED7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F6ADDBAF-567A-4BD4-9C5D-C38770F3AED7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F6ADDBAF-567A-4BD4-9C5D-C38770F3AED7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{8476E293-F754-47A3-A60F-F089B83F78D7} = {045D2FAD-333E-491C-AA0F-B15D7E582151}

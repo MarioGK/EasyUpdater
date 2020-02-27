@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
+using EasyUpdater.Crypto;
 using EasyUpdater.Helpers;
 using EasyUpdater.Models;
 
@@ -12,7 +13,7 @@ namespace EasyUpdater.UpdateRoutines
     internal class DynamicUpdateRoutine : BaseRoutine
     {
         private readonly AppConfiguration appConfiguration;
-        
+
         internal DynamicUpdateRoutine(AppConfiguration appConfiguration)
         {
             this.appConfiguration = appConfiguration;
@@ -20,10 +21,7 @@ namespace EasyUpdater.UpdateRoutines
 
         public override async Task Run()
         {
-            if (!NotifyStart())
-            {
-                return;
-            }
+            NotifyStart();
 
             var files = await FetchFiles();
 
@@ -40,18 +38,30 @@ namespace EasyUpdater.UpdateRoutines
                     foreach (var differentFile in differentFiles)
                     {
                         var url = appConfiguration.DownloadUrl + differentFile.FileName;
-                        var downloadLocation = Path.Combine(AssemblyPath, differentFile.FilePath);
+                        var downloadLocation = Path.Combine(AssemblyPath, differentFile.RelativeFilePath);
                         DownloadFile(url, downloadLocation);
                     }
                 }
             }
 
-            if (!NotifyEnd())
-            {
-                return;
-            }
+            NotifyEnd();
+        }
+
+        /// <summary>
+        ///     Returns the different files
+        /// </summary>
+        /// <returns></returns>
+        private IEnumerable<AppFile> GetDifferentFiles(IEnumerable<AppFile> remoteFiles)
+        {
+            return from remoteFile in remoteFiles
+                let localFile = Path.Combine(AssemblyPath, remoteFile.RelativeFilePath)
+                let localFileChecksum = localFile.CalculateChecksum()
+                where remoteFile.Checksum != localFileChecksum
+                select remoteFile;
         }
         
+
+
         public async Task<List<AppFile>> FetchFiles()
         {
             return await JsonFetcher.FetchAsync<List<AppFile>>(appConfiguration.DownloadUrl + "/files.json");
